@@ -1,0 +1,18 @@
+{
+  "bucket": "document-processor-documents-i6ofs30v",
+  "key": "uploads/invoice.pdf",
+  "document_id": "doc-20250713-123456-abc12345",
+  "images": [
+    {
+      "page": 1,
+      "s3_key": "processed/doc-20250713-123456-abc12345/page_1.png"
+    }
+  ],
+  "qr_codes": [
+    {
+      "page": 1,
+      "data": "INV-2024-001",
+      "position": {"x": 100, "y": 50, "width": 80, "height": 80}
+    }
+  ]
+}

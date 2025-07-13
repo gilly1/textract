@@ -257,6 +257,32 @@ resource "aws_lambda_layer_version" "qr" {
   source_code_hash    = data.archive_file.qr_layer.output_base64sha256
 }
 
+# PDF Layer with dependencies
+resource "null_resource" "install_pdf_deps" {
+  triggers = {
+    requirements = filemd5("${path.module}/../layers/pdf/requirements.txt")
+  }
+  
+  provisioner "local-exec" {
+    command = local.is_windows ? "powershell.exe -Command \"if (!(Test-Path '${path.module}/../.build/layers/pdf_deps')) { New-Item -ItemType Directory -Path '${path.module}/../.build/layers/pdf_deps' -Force }; pip install -r '${path.module}/../layers/pdf/requirements.txt' -t '${path.module}/../.build/layers/pdf_deps'\"" : "mkdir -p '${path.module}/../.build/layers/pdf_deps' && pip3 install -r '${path.module}/../layers/pdf/requirements.txt' -t '${path.module}/../.build/layers/pdf_deps'"
+  }
+}
+
+data "archive_file" "pdf_layer" {
+  type        = "zip"
+  source_dir  = "${path.module}/../.build/layers/pdf_deps"
+  output_path = "${path.module}/../.build/layers/pdf.zip"
+  
+  depends_on = [null_resource.install_pdf_deps]
+}
+
+resource "aws_lambda_layer_version" "pdf" {
+  filename            = data.archive_file.pdf_layer.output_path
+  layer_name          = "${var.project_name}-pdf-layer"
+  compatible_runtimes = ["python3.12"]
+  source_code_hash    = data.archive_file.pdf_layer.output_base64sha256
+}
+
 # Step Function trigger Lambda
 resource "aws_lambda_function" "step_function_trigger" {
   filename         = data.archive_file.step_function_trigger.output_path
@@ -419,7 +445,7 @@ resource "aws_lambda_function" "convert_to_image" {
   memory_size     = 1024
   source_code_hash = data.archive_file.convert_to_image.output_base64sha256
 
-  layers = [aws_lambda_layer_version.common.arn]
+  layers = [aws_lambda_layer_version.common.arn, aws_lambda_layer_version.pdf.arn]
 
   environment {
     variables = {

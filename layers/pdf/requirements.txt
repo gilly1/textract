@@ -1,0 +1,3 @@
+# PDF Processing Layer Requirements
+PyMuPDF==1.23.26
+Pillow>=9.0.0,<11.0.0

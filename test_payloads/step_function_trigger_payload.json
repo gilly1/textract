@@ -1,0 +1,19 @@
+{
+  "Records": [
+    {
+      "eventName": "INSERT",
+      "dynamodb": {
+        "NewImage": {
+          "document_id": {"S": "doc-20250713-123456-abc12345"},
+          "bucket": {"S": "document-processor-documents-i6ofs30v"},
+          "key": {"S": "uploads/invoice.pdf"},
+          "status": {"S": "pending"},
+          "upload_date": {"S": "2025-07-13T12:34:56Z"},
+          "processed_date": {"S": "2025-07-13T12:34:56Z"},
+          "file_type": {"S": "pdf"},
+          "source": {"S": "manual_trigger"}
+        }
+      }
+    }
+  ]
+}

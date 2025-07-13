@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "Building Lambda layers..." -ForegroundColor Green
 
-$Layers = @("ocr", "qr", "common")
+$Layers = @("ocr", "qr", "pdf", "common")
 $BaseDir = Split-Path (Get-Location).Path -Parent
 $BuildDir = "$BaseDir\.build\layers"
 
