@@ -14,6 +14,13 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+  
+  # Increase timeouts for large layer uploads
+  default_tags {
+    tags = {
+      Project = var.project_name
+    }
+  }
 }
 
 # Local values for cross-platform compatibility
