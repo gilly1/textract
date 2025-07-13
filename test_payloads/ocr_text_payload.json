@@ -1,11 +1,11 @@
 {
   "bucket": "document-processor-documents-i6ofs30v",
-  "key": "uploads/invoice.pdf",
+  "key": "uploads/invoice.png",
   "document_id": "doc-20250713-123456-abc12345",
   "images": [
     {
       "page": 1,
-      "s3_key": "processed/doc-20250713-123456-abc12345/page_1.png"
+      "s3_key": "uploads/invoice.png"
     }
   ],
   "qr_codes": [

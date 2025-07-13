@@ -6,7 +6,7 @@ set -e
 
 echo "🚀 Building Lambda layers..."
 
-LAYERS=("ocr" "qr" "pdf" "common")
+LAYERS=("ocr" "qr" "common")
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$BASE_DIR/.build/layers"
 

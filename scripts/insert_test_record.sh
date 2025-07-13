@@ -5,7 +5,7 @@ set -e
 # This script inserts a record into the DynamoDB table that will trigger
 # the document processing pipeline via DynamoDB Streams.
 
-FILE_NAME="${1:-invoice.pdf}"
+FILE_NAME="${1:-invoice.png}"
 BUCKET_NAME="${2:-}"
 TABLE_NAME="${3:-}"
 
@@ -43,7 +43,7 @@ DYNAMO_ITEM=$(cat <<EOF
     "status": {"S": "pending"},
     "upload_date": {"S": "$CURRENT_DATE"},
     "processed_date": {"S": "$CURRENT_DATE"},
-    "file_type": {"S": "pdf"},
+    "file_type": {"S": "image"},
     "source": {"S": "manual_trigger"}
 }
 EOF

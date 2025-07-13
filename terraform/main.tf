@@ -187,7 +187,6 @@ resource "aws_iam_role_policy" "step_function_policy" {
           "lambda:InvokeFunction"
         ]
         Resource = [
-          aws_lambda_function.convert_to_image.arn,
           aws_lambda_function.qr_scanner.arn,
           aws_lambda_function.ocr_text.arn,
           aws_lambda_function.validator.arn
@@ -264,33 +263,6 @@ resource "aws_lambda_layer_version" "qr" {
   source_code_hash    = data.archive_file.qr_layer.output_base64sha256
 }
 
-# PDF Layer with dependencies
-resource "null_resource" "install_pdf_deps" {
-  triggers = {
-    requirements = filemd5("${path.module}/../layers/pdf/requirements.txt")
-  }
-  
-  provisioner "local-exec" {
-    command = local.is_windows ? "powershell.exe -Command \"if (!(Test-Path '${path.module}/../.build/layers/pdf_deps')) { New-Item -ItemType Directory -Path '${path.module}/../.build/layers/pdf_deps' -Force }; pip install -r '${path.module}/../layers/pdf/requirements.txt' -t '${path.module}/../.build/layers/pdf_deps'\"" : "mkdir -p '${path.module}/../.build/layers/pdf_deps' && pip3 install -r '${path.module}/../layers/pdf/requirements.txt' -t '${path.module}/../.build/layers/pdf_deps'"
-  }
-}
-
-
-# data "archive_file" "pdf_layer" {
-#   type        = "zip"
-#   source_dir  = "${path.module}/../.build/layers/pdf_deps"
-#   output_path = "${path.module}/../.build/layers/pdf.zip"
-  
-#   depends_on = [null_resource.install_pdf_deps]
-# }
-
-# resource "aws_lambda_layer_version" "pdf" {
-#   filename            = data.archive_file.pdf_layer.output_path
-#   layer_name          = "${var.project_name}-pdf-layer"
-#   compatible_runtimes = ["python3.12"]
-#   source_code_hash    = data.archive_file.pdf_layer.output_base64sha256
-# }
-
 # Step Function trigger Lambda
 resource "aws_lambda_function" "step_function_trigger" {
   filename         = data.archive_file.step_function_trigger.output_path
@@ -327,16 +299,22 @@ def lambda_handler(event, context):
             new_image = record['dynamodb'].get('NewImage', {})
             
             # Extract relevant fields from the DynamoDB record
-            # Assuming the record contains document processing info
             document_id = new_image.get('document_id', {}).get('S', '')
             s3_bucket = new_image.get('bucket', {}).get('S', '')
             s3_key = new_image.get('key', {}).get('S', '')
             
             if document_id and s3_bucket and s3_key:
+                # For images only - create single image array
                 input_data = {
                     "document_id": document_id,
                     "bucket": s3_bucket,
-                    "key": s3_key
+                    "key": s3_key,
+                    "images": [
+                        {
+                            "page": 1,
+                            "s3_key": s3_key
+                        }
+                    ]
                 }
                 
                 step_functions.start_execution(
@@ -373,22 +351,9 @@ resource "aws_sfn_state_machine" "document_processor" {
   role_arn = aws_iam_role.step_function_role.arn
 
   definition = jsonencode({
-    Comment = "Document processing pipeline"
-    StartAt = "ConvertToImage"
+    Comment = "Document processing pipeline - Images only"
+    StartAt = "ProcessImages"
     States = {
-      ConvertToImage = {
-        Type = "Task"
-        Resource = aws_lambda_function.convert_to_image.arn
-        Next = "ProcessImages"
-        Retry = [
-          {
-            ErrorEquals = ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-            IntervalSeconds = 2
-            MaxAttempts = 3
-            BackoffRate = 2
-          }
-        ]
-      }
       ProcessImages = {
         Type = "Map"
         ItemsPath = "$.images"
@@ -436,33 +401,6 @@ resource "aws_sfn_state_machine" "document_processor" {
 }
 
 # Lambda Functions
-data "archive_file" "convert_to_image" {
-  type        = "zip"
-  source_dir  = "${path.module}/../lambdas/convert_to_image"
-  output_path = "${path.module}/../.build/convert_to_image.zip"
-  excludes    = ["__pycache__"]
-}
-
-resource "aws_lambda_function" "convert_to_image" {
-  filename         = data.archive_file.convert_to_image.output_path
-  function_name    = "${var.project_name}-convert-to-image"
-  role            = aws_iam_role.lambda_role.arn
-  handler         = "app.lambda_handler"
-  runtime         = "python3.12"
-  timeout         = 300
-  memory_size     = 1024
-  source_code_hash = data.archive_file.convert_to_image.output_base64sha256
-
-    # , aws_lambda_layer_version.pdf.arn
-  layers = [aws_lambda_layer_version.common.arn]
-
-  environment {
-    variables = {
-      BUCKET_NAME = aws_s3_bucket.document_bucket.bucket
-    }
-  }
-}
-
 data "archive_file" "qr_scanner" {
   type        = "zip"
   source_dir  = "${path.module}/../lambdas/qr_scanner"
