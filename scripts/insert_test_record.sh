@@ -89,3 +89,4 @@ fi
 
 echo ""
 echo "🎉 Test record insertion completed!"
+
