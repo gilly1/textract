@@ -209,7 +209,7 @@ resource "null_resource" "install_ocr_deps" {
   }
   
   provisioner "local-exec" {
-    command = local.is_windows ? "powershell.exe -Command \"pip install -r '${path.module}/../layers/ocr/requirements.txt' -t '${path.module}/../.build/layers/ocr_deps' --platform linux_x86_64 --only-binary=:all:\"" : "pip3 install -r '${path.module}/../layers/ocr/requirements.txt' -t '${path.module}/../.build/layers/ocr_deps' --platform linux_x86_64 --only-binary=:all:"
+    command = local.is_windows ? "powershell.exe -Command \"if (!(Test-Path '${path.module}/../.build/layers/ocr_deps')) { New-Item -ItemType Directory -Path '${path.module}/../.build/layers/ocr_deps' -Force }; pip install -r '${path.module}/../layers/ocr/requirements.txt' -t '${path.module}/../.build/layers/ocr_deps'\"" : "mkdir -p '${path.module}/../.build/layers/ocr_deps' && pip3 install -r '${path.module}/../layers/ocr/requirements.txt' -t '${path.module}/../.build/layers/ocr_deps'"
   }
 }
 
@@ -235,7 +235,7 @@ resource "null_resource" "install_qr_deps" {
   }
   
   provisioner "local-exec" {
-    command = local.is_windows ? "powershell.exe -Command \"pip install -r '${path.module}/../layers/qr/requirements.txt' -t '${path.module}/../.build/layers/qr_deps' --platform linux_x86_64 --only-binary=:all:\"" : "pip3 install -r '${path.module}/../layers/qr/requirements.txt' -t '${path.module}/../.build/layers/qr_deps' --platform linux_x86_64 --only-binary=:all:"
+    command = local.is_windows ? "powershell.exe -Command \"if (!(Test-Path '${path.module}/../.build/layers/qr_deps')) { New-Item -ItemType Directory -Path '${path.module}/../.build/layers/qr_deps' -Force }; pip install -r '${path.module}/../layers/qr/requirements.txt' -t '${path.module}/../.build/layers/qr_deps'\"" : "mkdir -p '${path.module}/../.build/layers/qr_deps' && pip3 install -r '${path.module}/../layers/qr/requirements.txt' -t '${path.module}/../.build/layers/qr_deps'"
   }
 }
 
