@@ -1,3 +1,9 @@
+# Local values for cross-platform compatibility
+locals {
+  # Simple platform detection using path separator
+  is_windows = substr(replace(path.cwd, "/", ""), 1, 1) == ":"
+}
+
 resource "null_resource" "build_layers" {
   triggers = {
     # This hashes the entire 'layers/common/python/utils' directory recursively
@@ -5,9 +11,7 @@ resource "null_resource" "build_layers" {
   }
 
   provisioner "local-exec" {
-    command = local.is_windows 
-      ? "powershell.exe -ExecutionPolicy Bypass -File ../../scripts/build_layers.ps1" 
-      : "bash ../../scripts/build_layers.sh"
+    command = local.is_windows  ? "powershell.exe -ExecutionPolicy Bypass -File ../../scripts/build_layers.ps1"  : "bash ../../scripts/build_layers.sh"
 
     working_dir = path.module
   }

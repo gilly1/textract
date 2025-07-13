@@ -276,20 +276,20 @@ resource "null_resource" "install_pdf_deps" {
 }
 
 
-data "archive_file" "pdf_layer" {
-  type        = "zip"
-  source_dir  = "${path.module}/../.build/layers/pdf_deps"
-  output_path = "${path.module}/../.build/layers/pdf.zip"
+# data "archive_file" "pdf_layer" {
+#   type        = "zip"
+#   source_dir  = "${path.module}/../.build/layers/pdf_deps"
+#   output_path = "${path.module}/../.build/layers/pdf.zip"
   
-  depends_on = [null_resource.install_pdf_deps]
-}
+#   depends_on = [null_resource.install_pdf_deps]
+# }
 
-resource "aws_lambda_layer_version" "pdf" {
-  filename            = data.archive_file.pdf_layer.output_path
-  layer_name          = "${var.project_name}-pdf-layer"
-  compatible_runtimes = ["python3.12"]
-  source_code_hash    = data.archive_file.pdf_layer.output_base64sha256
-}
+# resource "aws_lambda_layer_version" "pdf" {
+#   filename            = data.archive_file.pdf_layer.output_path
+#   layer_name          = "${var.project_name}-pdf-layer"
+#   compatible_runtimes = ["python3.12"]
+#   source_code_hash    = data.archive_file.pdf_layer.output_base64sha256
+# }
 
 # Step Function trigger Lambda
 resource "aws_lambda_function" "step_function_trigger" {
@@ -453,7 +453,8 @@ resource "aws_lambda_function" "convert_to_image" {
   memory_size     = 1024
   source_code_hash = data.archive_file.convert_to_image.output_base64sha256
 
-  layers = [aws_lambda_layer_version.common.arn, aws_lambda_layer_version.pdf.arn]
+    # , aws_lambda_layer_version.pdf.arn
+  layers = [aws_lambda_layer_version.common.arn]
 
   environment {
     variables = {
