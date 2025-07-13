@@ -40,24 +40,17 @@ resource "aws_s3_bucket_versioning" "document_bucket_versioning" {
   }
 }
 
-resource "aws_s3_bucket_notification" "bucket_notification" {
-  bucket = aws_s3_bucket.document_bucket.id
-
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.step_function_trigger.arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "uploads/"
-    filter_suffix       = ".pdf"
-  }
-
-  depends_on = [aws_lambda_permission.allow_s3]
-}
+# Removed S3 bucket notification - using DynamoDB Streams instead
 
 # DynamoDB Table for results
 resource "aws_dynamodb_table" "document_results" {
   name           = "${var.project_name}-results"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "document_id"
+
+  # Enable DynamoDB Streams to trigger Step Function
+  stream_enabled   = true
+  stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
     name = "document_id"
@@ -134,6 +127,16 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "dynamodb:UpdateItem"
         ]
         Resource = aws_dynamodb_table.document_results.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:DescribeStream",
+          "dynamodb:GetRecords",
+          "dynamodb:GetShardIterator",
+          "dynamodb:ListStreams"
+        ]
+        Resource = aws_dynamodb_table.document_results.stream_arn
       },
       {
         Effect = "Allow"
@@ -279,24 +282,33 @@ data "archive_file" "step_function_trigger" {
 import json
 import boto3
 import os
-from urllib.parse import unquote_plus
 
 def lambda_handler(event, context):
     step_functions = boto3.client('stepfunctions')
     
     for record in event['Records']:
-        bucket = record['s3']['bucket']['name']
-        key = unquote_plus(record['s3']['object']['key'])
-        
-        input_data = {
-            "bucket": bucket,
-            "key": key
-        }
-        
-        step_functions.start_execution(
-            stateMachineArn=os.environ['STEP_FUNCTION_ARN'],
-            input=json.dumps(input_data)
-        )
+        # Check if this is an INSERT event for DynamoDB Streams
+        if record['eventName'] == 'INSERT':
+            # Extract the new image data from DynamoDB event
+            new_image = record['dynamodb'].get('NewImage', {})
+            
+            # Extract relevant fields from the DynamoDB record
+            # Assuming the record contains document processing info
+            document_id = new_image.get('document_id', {}).get('S', '')
+            s3_bucket = new_image.get('bucket', {}).get('S', '')
+            s3_key = new_image.get('key', {}).get('S', '')
+            
+            if document_id and s3_bucket and s3_key:
+                input_data = {
+                    "document_id": document_id,
+                    "bucket": s3_bucket,
+                    "key": s3_key
+                }
+                
+                step_functions.start_execution(
+                    stateMachineArn=os.environ['STEP_FUNCTION_ARN'],
+                    input=json.dumps(input_data)
+                )
     
     return {'statusCode': 200}
 EOF
@@ -304,12 +316,21 @@ EOF
   }
 }
 
-resource "aws_lambda_permission" "allow_s3" {
-  statement_id  = "AllowExecutionFromS3Bucket"
+resource "aws_lambda_permission" "allow_dynamodb" {
+  statement_id  = "AllowExecutionFromDynamoDBStream"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.step_function_trigger.function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = aws_s3_bucket.document_bucket.arn
+  principal     = "dynamodb.amazonaws.com"
+  source_arn    = aws_dynamodb_table.document_results.stream_arn
+}
+
+# DynamoDB Stream Event Source Mapping
+resource "aws_lambda_event_source_mapping" "dynamodb_trigger" {
+  event_source_arn  = aws_dynamodb_table.document_results.stream_arn
+  function_name     = aws_lambda_function.step_function_trigger.arn
+  starting_position = "LATEST"
+  
+  depends_on = [aws_lambda_permission.allow_dynamodb]
 }
 
 # Step Function State Machine
