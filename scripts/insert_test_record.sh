@@ -15,7 +15,9 @@ echo "🚀 Inserting test record into DynamoDB..."
 if [[ -z "$BUCKET_NAME" ]] || [[ -z "$TABLE_NAME" ]]; then
     echo "📋 Getting Terraform outputs..."
     
-    TERRAFORM_DIR="$(dirname "$(pwd)")/terraform"
+    # Get the correct terraform directory path
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    TERRAFORM_DIR="$(dirname "$SCRIPT_DIR")/terraform"
     
     if [[ -z "$BUCKET_NAME" ]]; then
         BUCKET_NAME=$(cd "$TERRAFORM_DIR" && terraform output -raw s3_bucket_name)
