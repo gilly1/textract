@@ -1,7 +1,7 @@
 import json
 import os
 import tempfile
-import fitz  # PyMuPDF
+from pdf2image import convert_from_path
 from utils.logger import get_logger
 from utils.s3 import S3Client
 
@@ -39,21 +39,15 @@ def lambda_handler(event, context):
             if not s3_client.download_file(bucket, key, pdf_path):
                 raise Exception(f"Failed to download PDF from {bucket}/{key}")
             
-            # Open PDF and convert pages to images
-            pdf_document = fitz.open(pdf_path)
+            # Convert PDF pages to images using pdf2image
+            images = convert_from_path(pdf_path, dpi=200)  # High quality conversion
             image_keys = []
             
-            for page_num in range(len(pdf_document)):
-                page = pdf_document.load_page(page_num)
-                
-                # Convert page to PNG with high resolution
-                mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better quality
-                pix = page.get_pixmap(matrix=mat)
-                
+            for page_num, image in enumerate(images):
                 # Save image locally
                 image_filename = f"page_{page_num + 1}.png"
                 image_path = os.path.join(temp_dir, image_filename)
-                pix.save(image_path)
+                image.save(image_path, 'PNG')
                 
                 # Upload image to S3
                 base_key = key.rsplit('.', 1)[0]  # Remove .pdf extension
@@ -64,8 +58,6 @@ def lambda_handler(event, context):
                     logger.info(f"Uploaded image: {bucket}/{image_key}")
                 else:
                     logger.error(f"Failed to upload image: {image_key}")
-            
-            pdf_document.close()
             
             logger.info(f"Successfully converted {len(image_keys)} pages to images")
             
