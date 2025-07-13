@@ -1,0 +1,2 @@
+# Convert to Image Lambda Requirements
+PyMuPDF==1.23.14

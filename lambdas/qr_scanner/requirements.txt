@@ -1,0 +1,1 @@
+# QR Scanner Lambda Requirements (minimal - main deps in layer)

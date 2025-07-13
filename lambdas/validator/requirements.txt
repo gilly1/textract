@@ -1,0 +1,2 @@
+# Validator Lambda Requirements
+boto3==1.34.0
