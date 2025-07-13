@@ -56,5 +56,5 @@ terraform/
 .terraform*
 # Additional files
 terraform.tfvars
-# Scripts
+
 scripts/.build

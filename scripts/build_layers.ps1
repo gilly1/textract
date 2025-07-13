@@ -37,17 +37,23 @@ foreach ($layer in $Layers) {
 
     # Install dependencies if requirements.txt exists
     if (Test-Path $RequirementsFile) {
-        Write-Host "Installing Python dependencies for $layer..." -ForegroundColor Cyan
-
+        Write-Host "📦 Installing Python dependencies for $layer..." -ForegroundColor Cyan
+        
         try {
+            # Try platform-specific install first
             & pip install -r $RequirementsFile -t $TempDir --no-deps --platform linux_x86_64 --only-binary=:all:
             if ($LASTEXITCODE -ne 0) {
-                throw "pip install failed for $layer"
+                Write-Host "⚠️ Platform-specific install failed, trying fallback..." -ForegroundColor Yellow
+                # Fallback: install without platform restrictions
+                & pip install -r $RequirementsFile -t $TempDir
+                if ($LASTEXITCODE -ne 0) {
+                    throw "pip install failed for $layer"
+                }
             }
-            Write-Host "Dependencies installed for $layer" -ForegroundColor Green
+            Write-Host "✅ Dependencies installed for $layer" -ForegroundColor Green
         }
         catch {
-            Write-Host "Failed to install dependencies for ${layer}: $($_)" -ForegroundColor Red
+            Write-Host "❌ Failed to install dependencies for ${layer}: $($_)" -ForegroundColor Red
             continue
         }
     }
