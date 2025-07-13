@@ -26,19 +26,11 @@ for layer in "${LAYERS[@]}"; do
     TEMP_DIR="$BASE_DIR/layers_tmp/$layer"
 
     # Clean up previous builds
-    if [ -d "$TEMP_DIR" ]; then
-        rm -rf "$TEMP_DIR"
-        echo "🧹 Cleaned temporary directory for $layer"
-    fi
-    if [ -f "$ZIP_FILE" ]; then
-        rm -f "$ZIP_FILE"
-        echo "🧹 Removed old zip file for $layer"
-    fi
-
-    # Create temporary directory
+    rm -rf "$TEMP_DIR" "$ZIP_FILE"
     mkdir -p "$TEMP_DIR"
+    echo "🧹 Cleaned previous build for $layer"
 
-    # Install dependencies if requirements.txt exists
+    # Install dependencies
     if [ -f "$REQUIREMENTS_FILE" ]; then
         echo "📦 Installing Python dependencies for $layer..."
         
@@ -50,17 +42,30 @@ for layer in "${LAYERS[@]}"; do
             echo "❌ pip not found. Please install Python and pip"
             exit 1
         fi
-        
-        # Install for Linux x86_64 platform
+
+        # Try platform-specific binary install first
         if ! $PIP_CMD install -r "$REQUIREMENTS_FILE" -t "$TEMP_DIR" \
-            --no-deps --platform linux_x86_64 --only-binary=:all: 2>/dev/null; then
-            # Fallback: install without platform restrictions
-            echo "⚠️ Platform-specific install failed, trying fallback..."
+            --platform manylinux2014_x86_64 \
+            --implementation cp \
+            --python-version 3.12 \
+            --abi cp312 \
+            --only-binary=:all:; then
+            echo "⚠️ Binary-only install failed, trying fallback with source builds..."
             $PIP_CMD install -r "$REQUIREMENTS_FILE" -t "$TEMP_DIR"
         fi
+
+        echo "📁 Contents of $TEMP_DIR after pip install:"
+        ls -lah "$TEMP_DIR"
+        
+        # Fail fast if install did nothing
+        if [ -z "$(ls -A "$TEMP_DIR")" ]; then
+            echo "❌ ERROR: No files installed for $layer. Aborting."
+            exit 1
+        fi
+
         echo "✅ Dependencies installed for $layer"
     fi
-    
+
     # Copy Python utility files if they exist
     if [ -d "$PYTHON_PATH" ]; then
         echo "📋 Copying Python utilities for $layer..."
@@ -70,26 +75,22 @@ for layer in "${LAYERS[@]}"; do
 
     # Create zip file
     echo "📦 Creating zip file for $layer..."
-    
-    # Change to temp directory to avoid including path in zip
-    cd "$TEMP_DIR"
-    
-    if command -v zip >/dev/null 2>&1; then
-        zip -r "$ZIP_FILE" . >/dev/null 2>&1
-    else
-        # Fallback using Python zipfile
-        python3 -c "
-import zipfile
-import os
+    (
+        cd "$TEMP_DIR"
+        if command -v zip >/dev/null 2>&1; then
+            zip -r "$ZIP_FILE" . >/dev/null 2>&1
+        else
+            python3 -c "
+import zipfile, os
 with zipfile.ZipFile('$ZIP_FILE', 'w', zipfile.ZIP_DEFLATED) as zf:
-    for root, dirs, files in os.walk('.'):
-        for file in files:
-            zf.write(os.path.join(root, file))
+    for root, _, files in os.walk('.'):
+        for f in files:
+            full_path = os.path.join(root, f)
+            zf.write(full_path, arcname=full_path)
 "
-    fi
-    
-    cd "$BASE_DIR"
-    
+        fi
+    )
+
     ZIP_SIZE=$(du -h "$ZIP_FILE" | cut -f1)
     echo "✅ Created $layer.zip ($ZIP_SIZE)"
 
@@ -98,11 +99,8 @@ with zipfile.ZipFile('$ZIP_FILE', 'w', zipfile.ZIP_DEFLATED) as zf:
 done
 
 # Clean up all temp directories
-TEMP_PARENT_DIR="$BASE_DIR/layers_tmp"
-if [ -d "$TEMP_PARENT_DIR" ]; then
-    rm -rf "$TEMP_PARENT_DIR"
-    echo "🧹 Cleaned up temporary directories"
-fi
+rm -rf "$BASE_DIR/layers_tmp"
+echo "🧹 Cleaned up temporary directories"
 
 echo "🎉 Layer build completed successfully!"
 echo "📍 Built layers are available in: $BUILD_DIR"
