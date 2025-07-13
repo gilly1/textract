@@ -16,6 +16,12 @@ provider "aws" {
   region = var.aws_region
 }
 
+# Local values for cross-platform compatibility
+locals {
+  # Simple platform detection using path separator
+  is_windows = substr(replace(path.cwd, "/", ""), 1, 1) == ":"
+}
+
 # S3 Bucket for document uploads
 resource "aws_s3_bucket" "document_bucket" {
   bucket = "${var.project_name}-documents-${random_string.bucket_suffix.result}"
@@ -188,7 +194,7 @@ resource "null_resource" "build_layers" {
   }
   
   provisioner "local-exec" {
-    command = "powershell.exe -ExecutionPolicy Bypass -File ${path.module}/../scripts/build_layers.ps1"
+    command = local.is_windows ? "powershell.exe -ExecutionPolicy Bypass -File ${path.module}/../scripts/build_layers.ps1" : "bash ${path.module}/../scripts/build_layers.sh"
     working_dir = path.module
   }
 }
