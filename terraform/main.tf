@@ -201,6 +201,7 @@ resource "aws_lambda_layer_version" "common" {
   source_code_hash    = data.archive_file.common_layer.output_base64sha256
 }
 
+
 # OCR Layer with dependencies
 resource "null_resource" "install_ocr_deps" {
   triggers = {
