@@ -187,43 +187,70 @@ resource "aws_iam_role_policy" "step_function_policy" {
   })
 }
 
-# Lambda Layers
-resource "null_resource" "build_layers" {
-  triggers = {
-    always_run = timestamp()
-  }
-  
-  provisioner "local-exec" {
-    command = local.is_windows ? "powershell.exe -ExecutionPolicy Bypass -File ${path.module}/../scripts/build_layers.ps1" : "bash ${path.module}/../scripts/build_layers.sh"
-    working_dir = path.module
-  }
+# Lambda Layers - Let Terraform handle the building
+data "archive_file" "common_layer" {
+  type        = "zip"
+  source_dir  = "${path.module}/../layers/common/python"
+  output_path = "${path.module}/../.build/layers/common.zip"
 }
 
 resource "aws_lambda_layer_version" "common" {
-  filename            = "${path.module}/../.build/layers/common.zip"
+  filename            = data.archive_file.common_layer.output_path
   layer_name          = "${var.project_name}-common-layer"
   compatible_runtimes = ["python3.12"]
-  source_code_hash    = filebase64sha256("${path.module}/../.build/layers/common.zip")
+  source_code_hash    = data.archive_file.common_layer.output_base64sha256
+}
+
+# OCR Layer with dependencies
+resource "null_resource" "install_ocr_deps" {
+  triggers = {
+    requirements = filemd5("${path.module}/../layers/ocr/requirements.txt")
+  }
   
-  depends_on = [null_resource.build_layers]
+  provisioner "local-exec" {
+    command = local.is_windows ? "powershell.exe -Command \"pip install -r '${path.module}/../layers/ocr/requirements.txt' -t '${path.module}/../.build/layers/ocr_deps' --platform linux_x86_64 --only-binary=:all:\"" : "pip3 install -r '${path.module}/../layers/ocr/requirements.txt' -t '${path.module}/../.build/layers/ocr_deps' --platform linux_x86_64 --only-binary=:all:"
+  }
+}
+
+data "archive_file" "ocr_layer" {
+  type        = "zip"
+  source_dir  = "${path.module}/../.build/layers/ocr_deps"
+  output_path = "${path.module}/../.build/layers/ocr.zip"
+  
+  depends_on = [null_resource.install_ocr_deps]
 }
 
 resource "aws_lambda_layer_version" "ocr" {
-  filename            = "${path.module}/../.build/layers/ocr.zip"
+  filename            = data.archive_file.ocr_layer.output_path
   layer_name          = "${var.project_name}-ocr-layer"
   compatible_runtimes = ["python3.12"]
-  source_code_hash    = filebase64sha256("${path.module}/../.build/layers/ocr.zip")
+  source_code_hash    = data.archive_file.ocr_layer.output_base64sha256
+}
+
+# QR Layer with dependencies
+resource "null_resource" "install_qr_deps" {
+  triggers = {
+    requirements = filemd5("${path.module}/../layers/qr/requirements.txt")
+  }
   
-  depends_on = [null_resource.build_layers]
+  provisioner "local-exec" {
+    command = local.is_windows ? "powershell.exe -Command \"pip install -r '${path.module}/../layers/qr/requirements.txt' -t '${path.module}/../.build/layers/qr_deps' --platform linux_x86_64 --only-binary=:all:\"" : "pip3 install -r '${path.module}/../layers/qr/requirements.txt' -t '${path.module}/../.build/layers/qr_deps' --platform linux_x86_64 --only-binary=:all:"
+  }
+}
+
+data "archive_file" "qr_layer" {
+  type        = "zip"
+  source_dir  = "${path.module}/../.build/layers/qr_deps"
+  output_path = "${path.module}/../.build/layers/qr.zip"
+  
+  depends_on = [null_resource.install_qr_deps]
 }
 
 resource "aws_lambda_layer_version" "qr" {
-  filename            = "${path.module}/../.build/layers/qr.zip"
+  filename            = data.archive_file.qr_layer.output_path
   layer_name          = "${var.project_name}-qr-layer"
   compatible_runtimes = ["python3.12"]
-  source_code_hash    = filebase64sha256("${path.module}/../.build/layers/qr.zip")
-  
-  depends_on = [null_resource.build_layers]
+  source_code_hash    = data.archive_file.qr_layer.output_base64sha256
 }
 
 # Step Function trigger Lambda
